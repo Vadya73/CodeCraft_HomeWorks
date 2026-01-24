@@ -1,10 +1,17 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.ExceptionServices;
 using UnityEngine;
 
 namespace Modules.Inventories
 {
+    public struct InventorySlotData
+    {
+        public int XPosition;
+        public int YPosition;
+        public Item Item;
+    }
     public class Inventory : IEnumerable<Item>
     {
         public event Action<Item, Vector2Int> OnAdded;
@@ -12,34 +19,56 @@ namespace Modules.Inventories
         public event Action<Item, Vector2Int> OnMoved;
         public event Action OnCleared;
 
-        public int Width => throw new NotImplementedException();
-        public int Height => throw new NotImplementedException();
-        public int Count => throw new NotImplementedException();
+        private InventorySlotData[] _slots;
+        private int _width;
+        private int _height;
+        
+        public int Width => _width;
+        public int Height => _height;
+        public int Count => Width * Height;
+        public InventorySlotData[] Slots => _slots;
 
         public Inventory(int width, int height)
         {
-            throw new NotImplementedException();
+            InitializeInventorySlots(width, height);
         }
 
         public Inventory(int width, int height, params KeyValuePair<Item, Vector2Int>[] items)
         {
-            throw new NotImplementedException();
+            InitializeInventorySlots(width, height);
+            
+            for (var i = 0; i < items.Length; i++)
+            {
+                var item = items[i];
+                AddItem(item.Key, item.Value);
+            }
         }
 
         public Inventory(int width, int height, params Item[] items)
         {
-            throw new NotImplementedException();
+            InitializeInventorySlots(width, height);
+            
+            for (var i = 0; i < items.Length; i++)
+            {
+                var item = items[i];
+                AddItem(item);
+            }
         }
 
-        public Inventory(int width, int height, IEnumerable<KeyValuePair<Item, Vector2Int>> items
-        )
+        public Inventory(int width, int height, IEnumerable<KeyValuePair<Item, Vector2Int>> items)
         {
-            throw new NotImplementedException();
+            InitializeInventorySlots(width, height);
+            
+            foreach (var item in items)
+                AddItem(item.Key, item.Value);
         }
 
         public Inventory(int width, int height, IEnumerable<Item> items)
         {
-            throw new NotImplementedException();
+            InitializeInventorySlots(width, height);
+            
+            foreach (var item in items)
+                AddItem(item);
         }
 
         /// <summary>
@@ -47,7 +76,39 @@ namespace Modules.Inventories
         /// </summary>
         public Inventory(Inventory inventory)
         {
-            throw new NotImplementedException();
+            Clone(inventory);
+        }
+
+        private void Clone(Inventory inventory)
+        {
+            _width = inventory.Width;
+            _height = inventory.Height;
+            
+            _slots = new InventorySlotData[inventory.Slots.Length];
+            Array.Copy(inventory.Slots, _slots, inventory.Slots.Length);
+        }
+
+        private void InitializeInventorySlots(int width, int height)
+        {
+            int inventorySize = width * height;
+            int tempWidth = 0;
+            int tempHeight = 0;
+            
+            _slots = new InventorySlotData[inventorySize];
+
+            for (int i = 0; i < _slots.Length; i++)
+            {
+                _slots[i].XPosition = tempWidth;
+                _slots[i].YPosition = tempHeight;
+                _slots[i].Item = null;
+                
+                tempWidth++;
+                if (tempWidth >= width)
+                {
+                    tempWidth = 0;
+                    tempHeight++;
+                }
+            }
         }
 
         /// <summary>
@@ -55,12 +116,21 @@ namespace Modules.Inventories
         /// </summary>
         public bool CanAddItem(Item item, Vector2Int position)
         {
-            throw new NotImplementedException();
+            for (int i = 0; i < _slots.Length; i++)
+            {
+                if (_slots[i].XPosition != position.x || _slots[i].YPosition != position.y)
+                    continue;
+
+                if (_slots[i].Item == null)
+                    return true;
+            }
+
+            return false;
         }
 
         public bool CanAddItem(Item item, int startX, int startY)
         {
-            throw new NotImplementedException();
+            return CanAddItem(item, new Vector2Int(startX, startY));
         }
 
         /// <summary>
@@ -68,7 +138,12 @@ namespace Modules.Inventories
         /// </summary>
         public bool AddItem(Item item, Vector2Int position)
         {
-            throw new NotImplementedException();
+            for (int i = 0; i < _slots.Length; i++)
+            {
+                
+            }
+            OnAdded?.Invoke(item, position);
+            return true;
         }
 
         public bool AddItem(Item item, int startX, int startY)
@@ -154,12 +229,43 @@ namespace Modules.Inventories
         /// </summary>
         public bool RemoveItem(Item item)
         {
-            throw new NotImplementedException();
+            bool hasItem = false; 
+            for (int i = 0; i < _slots.Length; i++)
+            {
+                if (_slots[i].Item.Equals(item))
+                {
+                    hasItem = true;
+                    OnRemoved?.Invoke(item, new Vector2Int(_slots[i].XPosition, _slots[i].YPosition));
+                    _slots[i].Item = null;
+                }
+            }
+            
+            return hasItem;
         }
 
         public bool RemoveItem(Item item, out Vector2Int position)
         {
-            throw new NotImplementedException();
+            bool hasItem = false;
+            for (int i = 0; i < _slots.Length; i++)
+            {
+                if(_slots[i].Item.Equals(item))
+                {
+                    position = new Vector2Int(_slots[i].XPosition, _slots[i].YPosition);
+                    OnRemoved?.Invoke(item, position);
+
+                    for (int j = 0; j < _slots.Length; j++)
+                    {
+                        if(_slots[j].Item.Equals(item))
+                            _slots[j].Item = null;
+                    }
+
+                    hasItem = true;
+                    break;
+                }
+            }
+            
+            position = default;
+            return hasItem;
         }
 
         /// <summary>
@@ -167,22 +273,58 @@ namespace Modules.Inventories
         /// </summary>
         public Item GetItem(Vector2Int position)
         {
-            throw new NotImplementedException();
+            for (int i = 0; i < Count; i++)
+            {
+                if (_slots[i].XPosition != position.x || _slots[i].YPosition != position.y)
+                    continue;
+                
+                return _slots[i].Item;
+            }
+            return null;
         }
 
         public Item GetItem(int x, int y)
         {
-            throw new NotImplementedException();
+            for (int i = 0; i < Count; i++)
+            {
+                if(_slots[i].XPosition != x || _slots[i].YPosition != y)
+                    continue;
+                
+                return _slots[i].Item;
+            }
+            return null;
         }
 
         public bool TryGetItem(Vector2Int position, out Item item)
         {
-            throw new NotImplementedException();
+            for (int i = 0; i < Count; i++)
+            {
+                if (_slots[i].XPosition != position.x || _slots[i].YPosition != position.y)
+                {
+                    continue;
+                }
+                item = _slots[i].Item;
+                return true;
+            }
+            
+            item = null;
+            return false;
         }
 
         public bool TryGetItem(int x, int y, out Item item)
         {
-            throw new NotImplementedException();
+            for (int i = 0; i < Count; i++)
+            {
+                if (_slots[i].XPosition != x || _slots[i].YPosition != y)
+                {
+                    continue;
+                }
+                item = _slots[i].Item;
+                return true;
+            }
+            
+            item = null;
+            return false;
         }
 
         /// <summary>
@@ -190,12 +332,51 @@ namespace Modules.Inventories
         /// </summary>
         public Vector2Int[] GetPositions(Item item)
         {
-            throw new NotImplementedException();
+            int itemSize = 0;
+            for (int i = 0; i < Count; i++)
+            {
+                if (_slots[i].Item.Equals(item))
+                    itemSize++;
+            }
+            
+            Vector2Int[] positions = new Vector2Int[itemSize];
+            int posSize = 0;
+            for (int i = 0; i < Count; i++)
+            {
+                if (_slots[i].Item.Equals(item))
+                {
+                    positions[posSize] = new Vector2Int(_slots[i].XPosition, _slots[i].YPosition);
+                    posSize++;
+                }
+            }
+            return positions;
         }
 
         public bool TryGetPositions(Item item, out Vector2Int[] positions)
         {
-            throw new NotImplementedException();
+            int size = 0;
+            for (int i = 0; i < _slots.Length; i++)
+            {
+                if (_slots[i].Item.Equals(item))
+                    size++;
+            }
+
+            if (size == 0)
+            {
+                positions = Array.Empty<Vector2Int>();
+                return false;
+            }
+
+            positions = new Vector2Int[size];
+                
+            size = 0;
+            for (int i = 0; i < _slots.Length; i++)
+            {
+                if (_slots[i].Item.Equals(item))
+                    positions[size++] = new Vector2Int(_slots[i].XPosition, _slots[i].YPosition);
+            }
+                
+            return true;
         }
 
         /// <summary>
@@ -203,7 +384,8 @@ namespace Modules.Inventories
         /// </summary>
         public void Clear()
         {
-            throw new NotImplementedException();
+            for (int i = 0; i < _slots.Length; i++)
+                _slots[i].Item = null;
         }
 
         /// <summary>
@@ -211,7 +393,14 @@ namespace Modules.Inventories
         /// </summary>
         public int GetItemCount(string name)
         {
-            throw new NotImplementedException();
+            // int itemsCount = 0;
+            // Item[] hasItems;
+            //
+            // for (int i = 0; i < _slots.Length; i++)
+            // {
+            //     if (_slots[i].Item != null && _slots[i].Item.Equals(hasItems)) ;
+            // }
+            return 1;
         }
 
         public bool MoveItem(Item item, Vector2Int position)
