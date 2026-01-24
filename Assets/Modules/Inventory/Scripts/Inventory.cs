@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Runtime.ExceptionServices;
 using UnityEngine;
 
 namespace Modules.Inventories
@@ -11,6 +10,7 @@ namespace Modules.Inventories
         public int XPosition;
         public int YPosition;
         public Item Item;
+        
     }
     public class Inventory : IEnumerable<Item>
     {
@@ -25,16 +25,37 @@ namespace Modules.Inventories
         
         public int Width => _width;
         public int Height => _height;
-        public int Count => Width * Height;
+        public int Count
+        {
+            get
+            {
+                var uniqueItems = new HashSet<Item>();
+                for (int i = 0; i < _slots.Length; i++)
+                {
+                    if (_slots[i].Item != null)
+                        uniqueItems.Add(_slots[i].Item);
+                }
+                return uniqueItems.Count;
+            }
+        }
         public InventorySlotData[] Slots => _slots;
 
         public Inventory(int width, int height)
         {
+            if (width <= 0 || height <= 0) 
+                throw new ArgumentException("Dimensions must be positive");
+            
             InitializeInventorySlots(width, height);
         }
 
         public Inventory(int width, int height, params KeyValuePair<Item, Vector2Int>[] items)
         {
+            if (width <= 0 || height <= 0) 
+                throw new ArgumentException("Dimensions must be positive");
+            
+            if (items == null) 
+                throw new ArgumentNullException(nameof(items));
+            
             InitializeInventorySlots(width, height);
             
             for (var i = 0; i < items.Length; i++)
@@ -46,6 +67,12 @@ namespace Modules.Inventories
 
         public Inventory(int width, int height, params Item[] items)
         {
+            if (width <= 0 || height <= 0) 
+                throw new ArgumentException("Dimensions must be positive");
+            
+            if (items == null) 
+                throw new ArgumentNullException(nameof(items));
+            
             InitializeInventorySlots(width, height);
             
             for (var i = 0; i < items.Length; i++)
@@ -57,6 +84,12 @@ namespace Modules.Inventories
 
         public Inventory(int width, int height, IEnumerable<KeyValuePair<Item, Vector2Int>> items)
         {
+            if (width <= 0 || height <= 0) 
+                throw new ArgumentException("Dimensions must be positive");
+            
+            if (items == null) 
+                throw new ArgumentNullException(nameof(items));
+            
             InitializeInventorySlots(width, height);
             
             foreach (var item in items)
@@ -65,6 +98,12 @@ namespace Modules.Inventories
 
         public Inventory(int width, int height, IEnumerable<Item> items)
         {
+            if (width <= 0 || height <= 0) 
+                throw new ArgumentException("Dimensions must be positive");
+            
+            if (items == null) 
+                throw new ArgumentNullException(nameof(items));
+            
             InitializeInventorySlots(width, height);
             
             foreach (var item in items)
@@ -90,6 +129,8 @@ namespace Modules.Inventories
 
         private void InitializeInventorySlots(int width, int height)
         {
+            _width = width;
+            _height = height;
             int inventorySize = width * height;
             int tempWidth = 0;
             int tempHeight = 0;
@@ -116,16 +157,33 @@ namespace Modules.Inventories
         /// </summary>
         public bool CanAddItem(Item item, Vector2Int position)
         {
-            for (int i = 0; i < _slots.Length; i++)
-            {
-                if (_slots[i].XPosition != position.x || _slots[i].YPosition != position.y)
-                    continue;
+            if (item == null) 
+                return false;
+            
+            if (item.Size.x <= 0 || item.Size.y <= 0) 
+                throw new ArgumentException("Item size must be positive");
+            
+            if (Contains(item)) 
+                return false;
 
-                if (_slots[i].Item == null)
-                    return true;
+            int startX = position.x;
+            int startY = position.y;
+            int endX = startX + item.Size.x;
+            int endY = startY + item.Size.y;
+
+            if (startX < 0 || startY < 0 || endX > _width || endY > _height)
+                return false;
+
+            for (int y = startY; y < endY; y++)
+            {
+                for (int x = startX; x < endX; x++)
+                {
+                    if (IsOccupied(x, y))
+                        return false;
+                }
             }
 
-            return false;
+            return true;
         }
 
         public bool CanAddItem(Item item, int startX, int startY)
@@ -138,17 +196,35 @@ namespace Modules.Inventories
         /// </summary>
         public bool AddItem(Item item, Vector2Int position)
         {
-            for (int i = 0; i < _slots.Length; i++)
-            {
-                
-            }
+            if (!CanAddItem(item, position))
+                return false;
+
+            SetItemAt(item, position);
+
             OnAdded?.Invoke(item, position);
             return true;
         }
 
+        private void SetItemAt(Item item, Vector2Int position)
+        {
+            int startX = position.x;
+            int startY = position.y;
+            int endX = startX + item.Size.x;
+            int endY = startY + item.Size.y;
+
+            for (int y = startY; y < endY; y++)
+            {
+                for (int x = startX; x < endX; x++)
+                {
+                    int index = y * _width + x;
+                    _slots[index].Item = item;
+                }
+            }
+        }
+
         public bool AddItem(Item item, int startX, int startY)
         {
-            throw new NotImplementedException();
+            return AddItem(item, new Vector2Int(startX, startY));
         }
 
         /// <summary>
@@ -156,7 +232,16 @@ namespace Modules.Inventories
         /// </summary>
         public bool CanAddItem(Item item)
         {
-            throw new NotImplementedException();
+            if (item == null) 
+                return false;
+            
+            if (item.Size.x <= 0 || item.Size.y <= 0) 
+                throw new ArgumentException("Item size must be positive");
+            
+            if (Contains(item)) 
+                return false;
+            
+            return FindFreePosition(item, out _);
         }
 
         /// <summary>
@@ -164,7 +249,16 @@ namespace Modules.Inventories
         /// </summary>
         public bool AddItem(Item item)
         {
-            throw new NotImplementedException();
+            if (item == null) 
+                return false;
+            
+            if (item.Size.x <= 0 || item.Size.y <= 0) 
+                throw new ArgumentException("Item size must be positive");
+            
+            if (FindFreePosition(item, out var position))
+                return AddItem(item, position);
+            
+            return false;
         }
 
         /// <summary>
@@ -172,22 +266,53 @@ namespace Modules.Inventories
         /// </summary>
         public bool FindFreePosition(Item item, out Vector2Int position)
         {
-            throw new NotImplementedException();
+            if (item == null)
+            {
+                position = default;
+                return false;
+            }
+            
+            return FindFreePosition(item.Size, out position);
         }
 
         public bool FindFreePosition(Vector2Int size, out Vector2Int position)
         {
-            throw new NotImplementedException();
+            return FindFreePosition(size.x, size.y, out position);
         }
 
         public bool FindFreePosition(int sizeX, int sizeY, out Vector2Int position)
         {
-            throw new NotImplementedException();
+            if (sizeX <= 0 || sizeY <= 0)
+                throw new ArgumentException("Size must be positive");
+
+            for (int y = 0; y <= _height - sizeY; y++)
+            {
+                for (int x = 0; x <= _width - sizeX; x++)
+                {
+                    if (IsFreeSpace(x, y, x + sizeX, y + sizeY))
+                    {
+                        position = new Vector2Int(x, y);
+                        return true;
+                    }
+                }
+            }
+
+            position = default;
+            return false;
         }
 
         private bool IsFreeSpace(int startX, int startY, int endX, int endY)
         {
-            throw new NotImplementedException();
+            for (int y = startY; y < endY; y++)
+            {
+                for (int x = startX; x < endX; x++)
+                {
+                    if (IsOccupied(x, y))
+                        return false;
+                }
+            }
+            
+            return true;
         }
 
         /// <summary>
@@ -195,7 +320,16 @@ namespace Modules.Inventories
         /// </summary>
         public bool Contains(Item item)
         {
-            throw new NotImplementedException();
+            if (item == null) 
+                return false;
+            
+            for (int i = 0; i < _slots.Length; i++)
+            {
+                if (_slots[i].Item != null && _slots[i].Item.Equals(item))
+                    return true;
+            }
+            
+            return false;
         }
 
         /// <summary>
@@ -203,12 +337,16 @@ namespace Modules.Inventories
         /// </summary>
         public bool IsOccupied(Vector2Int position)
         {
-            throw new NotImplementedException();
+            return IsOccupied(position.x, position.y);
         }
 
         public bool IsOccupied(int x, int y)
         {
-            throw new NotImplementedException();
+            if (x < 0 || x >= _width || y < 0 || y >= _height)
+                return true;
+
+            int index = y * _width + x;
+            return _slots[index].Item != null;
         }
 
         /// <summary>
@@ -216,12 +354,16 @@ namespace Modules.Inventories
         /// </summary>
         public bool IsFree(Vector2Int position)
         {
-            throw new NotImplementedException();
+            return IsFree(position.x, position.y);
         }
 
         public bool IsFree(int x, int y)
         {
-            throw new NotImplementedException();
+            if (x < 0 || x >= _width || y < 0 || y >= _height)
+                return false;
+
+            int index = y * _width + x;
+            return _slots[index].Item == null;
         }
 
         /// <summary>
@@ -229,43 +371,61 @@ namespace Modules.Inventories
         /// </summary>
         public bool RemoveItem(Item item)
         {
-            bool hasItem = false; 
+            if (item == null) return false;
+            
+            bool hasItem = false;
+            Vector2Int position = Vector2Int.zero;
+
             for (int i = 0; i < _slots.Length; i++)
             {
-                if (_slots[i].Item.Equals(item))
+                if (_slots[i].Item != null && _slots[i].Item.Equals(item))
                 {
-                    hasItem = true;
-                    OnRemoved?.Invoke(item, new Vector2Int(_slots[i].XPosition, _slots[i].YPosition));
+                    if (!hasItem)
+                    {
+                        position = new Vector2Int(_slots[i].XPosition, _slots[i].YPosition);
+                        hasItem = true;
+                    }
                     _slots[i].Item = null;
                 }
             }
+
+            if (hasItem)
+                OnRemoved?.Invoke(item, position);
             
             return hasItem;
         }
 
         public bool RemoveItem(Item item, out Vector2Int position)
         {
+            if (item == null)
+            {
+                position = default;
+                return false;
+            }
+
             bool hasItem = false;
+            position = default;
+
             for (int i = 0; i < _slots.Length; i++)
             {
-                if(_slots[i].Item.Equals(item))
+                if (_slots[i].Item != null && _slots[i].Item.Equals(item))
                 {
-                    position = new Vector2Int(_slots[i].XPosition, _slots[i].YPosition);
-                    OnRemoved?.Invoke(item, position);
-
-                    for (int j = 0; j < _slots.Length; j++)
+                    if (!hasItem)
                     {
-                        if(_slots[j].Item.Equals(item))
-                            _slots[j].Item = null;
+                        position = new Vector2Int(_slots[i].XPosition, _slots[i].YPosition);
+                        hasItem = true;
                     }
-
-                    hasItem = true;
-                    break;
+                    _slots[i].Item = null;
                 }
             }
+
+            if (hasItem)
+            {
+                OnRemoved?.Invoke(item, position);
+                return true;
+            }
             
-            position = default;
-            return hasItem;
+            return false;
         }
 
         /// <summary>
@@ -273,58 +433,32 @@ namespace Modules.Inventories
         /// </summary>
         public Item GetItem(Vector2Int position)
         {
-            for (int i = 0; i < Count; i++)
-            {
-                if (_slots[i].XPosition != position.x || _slots[i].YPosition != position.y)
-                    continue;
-                
-                return _slots[i].Item;
-            }
-            return null;
+            return GetItem(position.x, position.y);
         }
 
         public Item GetItem(int x, int y)
         {
-            for (int i = 0; i < Count; i++)
-            {
-                if(_slots[i].XPosition != x || _slots[i].YPosition != y)
-                    continue;
-                
-                return _slots[i].Item;
-            }
-            return null;
+            if (x < 0 || x >= _width || y < 0 || y >= _height)
+                throw new IndexOutOfRangeException("Position out of range");
+            
+            return _slots[y * _width + x].Item;
         }
 
         public bool TryGetItem(Vector2Int position, out Item item)
         {
-            for (int i = 0; i < Count; i++)
-            {
-                if (_slots[i].XPosition != position.x || _slots[i].YPosition != position.y)
-                {
-                    continue;
-                }
-                item = _slots[i].Item;
-                return true;
-            }
-            
-            item = null;
-            return false;
+            return TryGetItem(position.x, position.y, out item);
         }
 
         public bool TryGetItem(int x, int y, out Item item)
         {
-            for (int i = 0; i < Count; i++)
+            if (x < 0 || x >= _width || y < 0 || y >= _height)
             {
-                if (_slots[i].XPosition != x || _slots[i].YPosition != y)
-                {
-                    continue;
-                }
-                item = _slots[i].Item;
-                return true;
+                item = null;
+                return false;
             }
             
-            item = null;
-            return false;
+            item = _slots[y * _width + x].Item;
+            return item != null;
         }
 
         /// <summary>
@@ -332,50 +466,56 @@ namespace Modules.Inventories
         /// </summary>
         public Vector2Int[] GetPositions(Item item)
         {
-            int itemSize = 0;
-            for (int i = 0; i < Count; i++)
-            {
-                if (_slots[i].Item.Equals(item))
-                    itemSize++;
-            }
+            if (item == null) 
+                throw new NullReferenceException(nameof(item));
             
-            Vector2Int[] positions = new Vector2Int[itemSize];
-            int posSize = 0;
-            for (int i = 0; i < Count; i++)
+            var positions = new List<Vector2Int>();
+            
+            for (int x = 0; x < _width; x++)
             {
-                if (_slots[i].Item.Equals(item))
+                for (int y = 0; y < _height; y++)
                 {
-                    positions[posSize] = new Vector2Int(_slots[i].XPosition, _slots[i].YPosition);
-                    posSize++;
+                    int index = y * _width + x;
+                    
+                    if (_slots[index].Item != null && _slots[index].Item.Equals(item))
+                        positions.Add(new Vector2Int(x, y));
                 }
             }
-            return positions;
+
+            if (positions.Count == 0) 
+                throw new KeyNotFoundException("Item not found");
+
+            return positions.ToArray();
         }
 
         public bool TryGetPositions(Item item, out Vector2Int[] positions)
         {
-            int size = 0;
-            for (int i = 0; i < _slots.Length; i++)
+            if (item == null)
             {
-                if (_slots[i].Item.Equals(item))
-                    size++;
-            }
-
-            if (size == 0)
-            {
-                positions = Array.Empty<Vector2Int>();
+                positions = null;
                 return false;
             }
 
-            positions = new Vector2Int[size];
-                
-            size = 0;
-            for (int i = 0; i < _slots.Length; i++)
+            var posList = new List<Vector2Int>();
+            
+            for (int x = 0; x < _width; x++)
             {
-                if (_slots[i].Item.Equals(item))
-                    positions[size++] = new Vector2Int(_slots[i].XPosition, _slots[i].YPosition);
+                for (int y = 0; y < _height; y++)
+                {
+                    int index = y * _width + x;
+                    
+                    if (_slots[index].Item != null && _slots[index].Item.Equals(item))
+                        posList.Add(new Vector2Int(x, y));
+                }
             }
-                
+
+            if (posList.Count == 0)
+            {
+                positions = null;
+                return false;
+            }
+
+            positions = posList.ToArray();
             return true;
         }
 
@@ -384,8 +524,13 @@ namespace Modules.Inventories
         /// </summary>
         public void Clear()
         {
+            if (Count == 0) 
+                return;
+
             for (int i = 0; i < _slots.Length; i++)
                 _slots[i].Item = null;
+            
+            OnCleared?.Invoke();
         }
 
         /// <summary>
@@ -393,19 +538,47 @@ namespace Modules.Inventories
         /// </summary>
         public int GetItemCount(string name)
         {
-            // int itemsCount = 0;
-            // Item[] hasItems;
-            //
-            // for (int i = 0; i < _slots.Length; i++)
-            // {
-            //     if (_slots[i].Item != null && _slots[i].Item.Equals(hasItems)) ;
-            // }
-            return 1;
+            var uniqueItems = new HashSet<Item>();
+            for (int i = 0; i < _slots.Length; i++)
+            {
+                if (_slots[i].Item != null && _slots[i].Item.Name == name)
+                    uniqueItems.Add(_slots[i].Item);
+            }
+            return uniqueItems.Count;
         }
 
         public bool MoveItem(Item item, Vector2Int position)
         {
-            throw new NotImplementedException();
+            if (item == null) throw new ArgumentNullException(nameof(item));
+            
+            if (!TryGetPositions(item, out var oldPositions))
+                return false;
+            
+            Vector2Int oldOrigin = oldPositions[0];
+            
+            var tempSlots = new List<int>();
+            for (int i = 0; i < _slots.Length; i++)
+            {
+                if (_slots[i].Item != null && _slots[i].Item.Equals(item))
+                {
+                    _slots[i].Item = null;
+                    tempSlots.Add(i);
+                }
+            }
+
+            if (CanAddItem(item, position))
+            {
+                SetItemAt(item, position);
+                OnMoved?.Invoke(item, position);
+                return true;
+            }
+
+            foreach (int index in tempSlots)
+            {
+                _slots[index].Item = item;
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -413,7 +586,23 @@ namespace Modules.Inventories
         /// </summary>
         public void OptimizeSpace()
         {
-            throw new NotImplementedException();
+            var items = new List<Item>();
+            foreach (var item in this)
+            {
+                items.Add(item);
+            }
+            
+            items.Sort((a, b) =>
+            {
+                int res = (b.Size.x * b.Size.y).CompareTo(a.Size.x * a.Size.y);
+                if (res != 0) return res;
+                return string.Compare(a.Name, b.Name, StringComparison.Ordinal);
+            });
+
+            Clear();
+
+            foreach (var item in items)
+                AddItem(item);
         }
 
         /// <summary>
@@ -421,12 +610,17 @@ namespace Modules.Inventories
         /// </summary>
         IEnumerator IEnumerable.GetEnumerator()
         {
-            throw new NotImplementedException();
+            return GetEnumerator();
         }
 
         public IEnumerator<Item> GetEnumerator()
         {
-            throw new NotImplementedException();
+            var uniqueItems = new HashSet<Item>();
+            for (int i = 0; i < _slots.Length; i++)
+            {
+                if (_slots[i].Item != null && uniqueItems.Add(_slots[i].Item))
+                    yield return _slots[i].Item;
+            }
         }
 
         /// <summary>
@@ -434,7 +628,19 @@ namespace Modules.Inventories
         /// </summary>
         public void CopyTo(Item[,] matrix)
         {
-            throw new NotImplementedException();
+            if (matrix == null) throw new ArgumentNullException(nameof(matrix));
+            
+            int matrixWidth = matrix.GetLength(0);
+            int matrixHeight = matrix.GetLength(1);
+            
+            int copyWidth = Math.Min(_width, matrixWidth);
+            int copyHeight = Math.Min(_height, matrixHeight);
+
+            for (int y = 0; y < copyHeight; y++)
+            {
+                for (int x = 0; x < copyWidth; x++)
+                    matrix[x, y] = _slots[y * _width + x].Item;
+            }
         }
 
         /// <summary>
@@ -442,7 +648,17 @@ namespace Modules.Inventories
         /// </summary>
         public override string ToString()
         {
-            throw new NotImplementedException();
+            var sb = new System.Text.StringBuilder();
+            for (int y = 0; y < _height; y++)
+            {
+                for (int x = 0; x < _width; x++)
+                {
+                    var item = GetItem(x, y);
+                    sb.Append(item != null ? "X" : ".");
+                }
+                if (y < _height - 1) sb.AppendLine();
+            }
+            return sb.ToString();
         }
     }
 }
