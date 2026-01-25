@@ -103,12 +103,6 @@ namespace Modules.Inventories
             Clone(inventory);
         }
         
-        private void ValidateItemSize(Item item)
-        {
-            if (item.Size.x <= 0 || item.Size.y <= 0)
-                throw new ArgumentException("Item size must be positive");
-        }
-
         /// <summary>
         /// Checks for adding an item on a specified position
         /// </summary>
@@ -584,6 +578,12 @@ namespace Modules.Inventories
             }
 
             return sb.ToString();
+        }
+        
+        private void ValidateItemSize(Item item)
+        {
+            if (item.Size.x <= 0 || item.Size.y <= 0)
+                throw new ArgumentException("Item size must be positive");
         }
         
         private void Clone(Inventory inventory)
