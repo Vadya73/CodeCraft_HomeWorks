@@ -8,10 +8,17 @@ namespace Game
     // +
     public sealed class BulletWorldGO : MonoBehaviour
     {
-        [SerializeField] private BulletData _prefab;
-        [SerializeField] private Transform _container;
-        [SerializeField] private BulletViewConfig _configView;
-        [SerializeField] private TransformBounds _levelBounds;
+        [SerializeField]
+        private BulletData _prefab;
+
+        [SerializeField]
+        private Transform _container;
+
+        [SerializeField]
+        private BulletViewConfig _configView;
+
+        [SerializeField]
+        private TransformBounds _levelBounds;
 
         private readonly Stack<BulletData> _pool = new();
         private readonly List<BulletData> _bullets = new();
