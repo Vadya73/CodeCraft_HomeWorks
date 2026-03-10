@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -8,6 +9,49 @@ namespace Modules.Inventories
 {
     public sealed partial class Inventory : IEnumerable<Item>
     {
+        public struct Enumerator : IEnumerator<Item>
+        {
+            private readonly Item[] _items;
+            private readonly int _count;
+            private int _index;
+            private Item _current;
+
+            internal Enumerator(Item[] items, int count)
+            {
+                _items = items;
+                _count = count;
+                _index = 0;
+                _current = null;
+            }
+
+            public Item Current => _current;
+            object IEnumerator.Current => Current;
+
+            public bool MoveNext()
+            {
+                while (_index < _count)
+                {
+                    Item candidate = _items[_index++];
+                    if (candidate != null)
+                    {
+                        _current = candidate;
+                        return true;
+                    }
+                }
+
+                _current = null;
+                return false;
+            }
+
+            public void Reset()
+            {
+                _index = 0;
+                _current = null;
+            }
+
+            public void Dispose() { }
+        }
+        
         public event Action<Item, Vector2Int> OnAdded;
         public event Action<Item, Vector2Int> OnRemoved;
         public event Action<Item, Vector2Int> OnMoved;
@@ -240,13 +284,7 @@ namespace Modules.Inventories
 
         public bool RemoveItem(Item item, out Vector2Int position)
         {
-            if (item == null)
-            {
-                position = default;
-                return false;
-            }
-
-            if (!_itemMap.TryGet(item, out var info))
+            if (item == null || !_itemMap.TryGet(item, out var info))
             {
                 position = default;
                 return false;
@@ -302,13 +340,7 @@ namespace Modules.Inventories
 
         public bool TryGetPositions(Item item, out Vector2Int[] positions)
         {
-            if (item == null)
-            {
-                positions = null;
-                return false;
-            }
-
-            if (!_itemMap.TryGet(item, out var info))
+            if (item == null || !_itemMap.TryGet(item, out var info))
             {
                 positions = null;
                 return false;
@@ -401,32 +433,33 @@ namespace Modules.Inventories
         {
             if (_itemsCount <= 1)
                 return;
+            
+            int count = _itemsCount;
+            Item[] temp = ArrayPool<Item>.Shared.Rent(count);
 
-            Item[] temp = new Item[_itemsCount];
-            for (int i = 0; i < _itemsCount; i++)
-                temp[i] = _items[i];
-
-            QuickSortItems(temp, 0, temp.Length - 1);
-
-            Clear();
-
-            for (int i = 0; i < temp.Length; i++)
-                AddItem(temp[i]);
+            try
+            { 
+                Array.Copy(_items, temp, count);
+                QuickSortItems(temp, 0, count - 1);
+                Clear();
+                
+                for (int i = 0; i < count; i++)
+                    AddItem(temp[i]);
+            }
+            finally
+            { 
+                Array.Clear(temp, 0, count);
+                ArrayPool<Item>.Shared.Return(temp);
+            }
         }
         
         /// <summary>
         /// Iterates by all items 
         /// </summary>
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+        IEnumerator<Item> IEnumerable<Item>.GetEnumerator() => GetEnumerator();
 
-        public IEnumerator<Item> GetEnumerator()
-        {
-            for (int i = 0; i < _itemsCount; i++)
-            {
-                if (_items[i] != null)
-                    yield return _items[i];
-            }
-        }
+        public Enumerator GetEnumerator() => new Enumerator(_items, _itemsCount);
 
         /// <summary>
         /// Copies items to a specified matrix
@@ -595,7 +628,7 @@ namespace Modules.Inventories
             EnsureItemsCapacity(_itemsCount + 1);
             int index = _itemsCount++;
             _items[index] = item;
-            _itemMap.TryAdd(item, new ItemInfo(position.x, position.y, index));
+            _itemMap.Add(item, new ItemInfo(position.x, position.y, index));
         }
 
         private void EnsureItemsCapacity(int required)

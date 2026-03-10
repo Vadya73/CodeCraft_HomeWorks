@@ -17,16 +17,16 @@ namespace Modules.Inventories
                 Index = index;
             }
         }
-
-        private struct MapEntry
-        {
-            public int Hash;
-            public Item Key;
-            public ItemInfo Value;
-        }
         
         private struct ItemMap
         {
+            private struct MapEntry
+            {
+                public int Hash;
+                public Item Key;
+                public ItemInfo Value;
+            }
+            
             private const int LoadFactorNumerator = 7;
             private const int LoadFactorDenominator = 10;
 
@@ -104,6 +104,16 @@ namespace Modules.Inventories
 
                 EnsureCapacity();
                 return TryInsert(key, value, overwrite: false);
+            }
+
+            public void Add(Item key, ItemInfo value)
+            {
+                if (key == null)
+                    throw new ArgumentNullException(nameof(key));
+
+                EnsureCapacity();
+                if (!TryInsert(key, value, overwrite: false))
+                    throw new ArgumentException("An item with the same key has already been added.", nameof(key));
             }
 
             public bool TryUpdate(Item key, ItemInfo value)
