@@ -22,22 +22,14 @@ namespace Game
 
         private void OnEnable()
         {
-            this.OnHealthChanged += health =>
-            {
-                _healthView.SetHealth(health, this.config.Health);
-                _cameraShaker.Shake();
-            };
-            this.OnDead += _gameOverView.Show;
+            this.OnHealthChanged += HandleHealthChanged;
+            this.OnDead += HandleDead;
         }
 
         private void OnDisable()
         {
-            this.OnHealthChanged -= health =>
-            {
-                _healthView.SetHealth(health, this.config.Health);
-                _cameraShaker.Shake();
-            };
-            this.OnDead -= _gameOverView.Show;
+            this.OnHealthChanged -= HandleHealthChanged;
+            this.OnDead -= HandleDead;
         }
 
         public void Update()
@@ -49,16 +41,25 @@ namespace Game
             float dy = Input.GetAxisRaw("Vertical");
             this.moveDirection = new Vector2(dx, dy);
 
-            if (this.currentHealth > 0)
-            {
-                _motor.MoveStep(this.moveDirection);
-            }
+            if (IsAlive)
+                _mover.MoveStep(this.moveDirection);
         }
 
         protected override void LateUpdate()
         {
             base.LateUpdate();
             this.transform.position = _playerArea.ClampInBounds(this.transform.position);
+        }
+
+        private void HandleHealthChanged(int health)
+        {
+            _healthView.SetHealth(health, MaxHealth);
+            _cameraShaker.Shake();
+        }
+
+        private void HandleDead()
+        {
+            _gameOverView.Show();
         }
     }
 }

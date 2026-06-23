@@ -1,6 +1,7 @@
 using System;
 using DG.Tweening;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace Game
 {
@@ -9,67 +10,63 @@ namespace Game
     {
         public event Action<int> OnHealthChanged;
         public event Action OnDead;
-
         public event Action<ShipController> OnFire;
 
-        public ShipControllerSO config;
+        [SerializeField, FormerlySerializedAs("config")]
+        private ShipControllerSO _config;
 
         [Header("Health")]
-        public int currentHealth;
+        [SerializeField, FormerlySerializedAs("currentHealth")]
+        private int _currentHealth;
 
         [Header("Combat")]
-        public Transform firePoint;
-        public float bulletSpeed;
-        public int bulletDamage;
+        [SerializeField, FormerlySerializedAs("firePoint")]
+        private Transform _firePoint;
+        [SerializeField, FormerlySerializedAs("bulletSpeed")]
+        private float _bulletSpeed;
+        [SerializeField, FormerlySerializedAs("bulletDamage")]
+        private int _bulletDamage;
         private float _fireTime;
 
         [Header("Movement")]
-        [SerializeField]
-        protected Motor _motor;
-        
+        [SerializeField, FormerlySerializedAs("_motor")]
+        protected Mover _mover;
         protected Vector3 moveDirection;
 
         [Header("Visual")]
-        [SerializeField]
-        private Renderer _renderer;
-
-        [SerializeField]
-        private Transform _viewTransform;
-
-        [SerializeField]
-        private AudioSource _audioSource;
-
-        [SerializeField]
-        private ShipControllerViewConfig _viewConfig;
-
-        [SerializeField]
-        private ParticleSystem _fireVFX;
-
-        [SerializeField]
-        private AudioClip _fireSFX;
-
-        [SerializeField]
-        private AudioClip _damageSFX;
+        [SerializeField] private Renderer _renderer;
+        [SerializeField] private Transform _viewTransform;
+        [SerializeField] private AudioSource _audioSource;
+        [SerializeField] private ShipControllerViewConfig _viewConfig;
+        [SerializeField] private ParticleSystem _fireVFX;
+        [SerializeField] private AudioClip _fireSFX;
+        [SerializeField] private AudioClip _damageSFX;
 
         private Material _material;
         private Tweener _damageAnimation;
 
+        public int Health => _currentHealth;
+        public int MaxHealth => _config.Health;
+        public bool IsAlive => _currentHealth > 0;
+        public Transform FirePoint => _firePoint;
+        public float BulletSpeed => _bulletSpeed;
+        public int BulletDamage => _bulletDamage;
 
         private void Awake()
         {
-            this.currentHealth = config.Health;
-            _motor.SetSpeed(config.MoveSpeed);
+            ResetHealth();
+            _mover.SetSpeed(_config.MoveSpeed);
 
             _material = new Material(_viewConfig.MaterialPrefab);
             _renderer.material = _material;
         }
 
-        protected virtual void FixedUpdate() => _motor.FixedUpdate();
+        protected virtual void FixedUpdate() => _mover.FixedUpdate();
 
         protected void Fire()
         {
             float time = Time.time;
-            if (time - _fireTime < config.FireCooldown || this.currentHealth <= 0)
+            if (time - _fireTime < _config.FireCooldown || !IsAlive)
                 return;
 
             if (_fireSFX)
@@ -81,7 +78,7 @@ namespace Game
             this.OnFire?.Invoke(this);
             _fireTime = time;
         }
-        
+
         protected virtual void LateUpdate()
         {
             this.AnimateMovement(Time.deltaTime);
@@ -92,32 +89,45 @@ namespace Game
             Vector3 shipAngles = _viewTransform.localEulerAngles;
             shipAngles.x = _viewConfig.MoveRotationAngle * moveDirection.y;
             shipAngles.y = _viewConfig.MoveRotationAngle / 2 * moveDirection.x * -1f;
-            
+
             Quaternion shipRotation = Quaternion.Euler(shipAngles);
             float t = _viewConfig.MoveSpeed * deltaTime;
             _viewTransform.localRotation = Quaternion.Lerp(_viewTransform.localRotation, shipRotation, t);
         }
-        
-        public void NotifyAboutHealthChanged(int health)
-        {
-            if (health > 0)
-                this.AnimateDamage();
 
-            this.OnHealthChanged?.Invoke(health);
+        public void ResetHealth()
+        {
+            _currentHealth = _config.Health;
+            this.OnHealthChanged?.Invoke(_currentHealth);
         }
 
-        public void NotifyAboutDead()
+        public void TakeDamage(int damage)
         {
-            // Instantiate particle vfx 
+            if (damage <= 0 || !IsAlive)
+                return;
+
+            _currentHealth = Mathf.Clamp(_currentHealth - damage, 0, MaxHealth);
+            if (IsAlive)
+                this.AnimateDamage();
+
+            this.OnHealthChanged?.Invoke(_currentHealth);
+
+            if (!IsAlive)
+                Die();
+        }
+
+        private void Die()
+        {
             ParticleSystem prefab = _viewConfig.DestroyEffectPrefab;
             Instantiate(prefab, _viewTransform.position, prefab.transform.rotation);
 
             this.OnDead?.Invoke();
+            gameObject.SetActive(false);
         }
 
         private void AnimateDamage()
         {
-            if (_damageAnimation.IsActive())
+            if (_damageAnimation != null && _damageAnimation.IsActive())
                 _damageAnimation.Kill();
 
             _damageAnimation = DOVirtual.Float(

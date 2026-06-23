@@ -7,13 +7,10 @@ namespace Game
     public sealed class ShipControllerSO : ScriptableObject
     {
         [Header("Core")]
-        [field: SerializeField]
-        public int Health { get; private set; } = 5;
+        [field: SerializeField] public int Health { get; private set; } = 5;
 
-        [field: SerializeField]
-        public float MoveSpeed { get; private set; } = 5;
+        [field: SerializeField] public float MoveSpeed { get; private set; } = 5;
 
-        [field: SerializeField]
-        public float FireCooldown { get; private set; } = 0.25f;
+        [field: SerializeField] public float FireCooldown { get; private set; } = 0.25f;
     }
 }

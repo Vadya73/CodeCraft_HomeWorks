@@ -5,18 +5,13 @@ namespace Game
     // +
     public sealed class Enemy : ShipController
     {
-        [Header("Enemy")]
-        public ShipController target;
-        public Vector2 destination;
+        [SerializeField] private float _fireCooldown = 1.25f;
+        [SerializeField] private float _stoppingDistance = 0.25f;
 
-        [SerializeField]
-        private float _fireCooldown = 1.25f;
-
-        [SerializeField]
-        private float _stoppingDistance = 0.25f;
+        private ShipController _target;
+        private Vector2 _destination;
 
         private float _fireTime;
-
         private IEnemyDespawner _despawner;
 
         public void SetDespawner(IEnemyDespawner despawner) => _despawner = despawner;
@@ -25,23 +20,23 @@ namespace Game
 
         private void OnDisable() => this.OnDead -= this.OnCharacterDead;
 
-        private void OnCharacterDead() => _despawner.Despawn(this);
+        private void OnCharacterDead() => _despawner?.Despawn(this);
 
         protected override void FixedUpdate()
         {
             base.FixedUpdate();
 
-            if (this.currentHealth <= 0 || this.target == null || this.target.currentHealth <= 0)
+            if (!IsAlive || _target == null || !_target.IsAlive)
                 return;
 
-            Vector2 distance = destination - (Vector2) this.transform.position;
+            Vector2 distance = _destination - (Vector2) this.transform.position;
             bool isNotReached = distance.sqrMagnitude > _stoppingDistance * _stoppingDistance;
             
             moveDirection = isNotReached ? distance.normalized : Vector3.zero;
 
             if (isNotReached)
             {
-                _motor.MoveStep(distance.normalized);
+                _mover.MoveStep(distance.normalized);
             }
             else
             {
@@ -52,6 +47,16 @@ namespace Game
                     _fireTime = time;
                 }
             }
+        }
+
+        public void SetDestination(Vector3 nextDestination)
+        {
+            _destination = nextDestination;
+        }
+
+        public void SetTarget(ShipController player)
+        {
+            _target = player;
         }
     }
 }
