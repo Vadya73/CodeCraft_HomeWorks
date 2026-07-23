@@ -1,24 +1,23 @@
 using System.Collections;
-using System.Collections.Generic;
-using Modules.UI;
 using Modules.Utils;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
 namespace Game
 {
-    public sealed class EnemyOrchestrator : MonoBehaviour, IEnemyDespawner
+    public sealed class EnemySpawner : MonoBehaviour, IEnemyDespawner
     {
         [Header("Spawn")]
         [SerializeField] private float _minSpawnCooldown = 2;
         [SerializeField] private float _maxSpawnCooldown = 3;
+        [SerializeField] private int _initialPoolSize = 5;
         private float _spawnCooldown;
         private float _spawnTime;
 
         [Header("Pool")]
         [SerializeField] private Enemy _prefab;
         [SerializeField] private Transform _container;
-        private readonly Queue<Enemy> _pool = new();
+        private ComponentPool<Enemy> _pool;
 
         [Header("Target")]
         [SerializeField] private ShipController _player;
@@ -29,24 +28,19 @@ namespace Game
         private int _spawnIndex;
         private int _attackIndex;
 
-        [Header("Bullets")]
-        [SerializeField] private BulletService _bulletWorld;
-
-        [Header("UI")]
-        [SerializeField] private ScoreView _scoreView;
-
-        private int _destroyedEnemies;
+        public event System.Action<Enemy> EnemySpawned;
+        public event System.Action<Enemy> EnemyDestroyed;
 
         private void Awake()
         {
+            _pool = new ComponentPool<Enemy>(_prefab, _container, _initialPoolSize);
             _spawnPositions.Shuffle();
             _attackPositions.Shuffle();
-            _scoreView.SetValue(_destroyedEnemies);
         }
 
         private void Start()
         {
-            this.ResetSpawnCooldown();
+            ResetSpawnCooldown();
         }
 
         private void FixedUpdate()
@@ -56,59 +50,31 @@ namespace Game
             if (time - _spawnTime < _spawnCooldown || !_player.IsAlive)
                 return;
 
-            Enemy enemy = GetEnemy();
-            enemy.transform.position = this.NextSpawnPosition();
-            enemy.SetDestination(NextDestination());
-            enemy.ResetHealth();
-            enemy.SetTarget(_player);
-            enemy.SetDespawner(this);
-            enemy.OnFire += this.OnFire;
+            Enemy enemy = _pool.Get();
+            enemy.transform.position = NextSpawnPosition();
+            enemy.Initialize(_player, NextDestination(), this);
+            EnemySpawned?.Invoke(enemy);
 
-            this.ResetSpawnCooldown();
+            ResetSpawnCooldown();
         }
 
         public void Despawn(Enemy enemy)
         {
-            enemy.OnFire -= this.OnFire;
-            _destroyedEnemies++;
-            _scoreView.SetValue(_destroyedEnemies);
-            this.StartCoroutine(DespawnInNextFrame(enemy));
-        }
-
-        private Enemy GetEnemy()
-        {
-            if (!_pool.TryDequeue(out Enemy enemy))
-                enemy = Instantiate(_prefab, _container);
-
-            enemy.gameObject.SetActive(true);
-            return enemy;
+            EnemyDestroyed?.Invoke(enemy);
+            StartCoroutine(DespawnInNextFrame(enemy));
         }
 
         private IEnumerator DespawnInNextFrame(Enemy enemy)
         {
             yield return null;
-            enemy.gameObject.SetActive(false);
-            _pool.Enqueue(enemy);
+            enemy.ResetState();
+            _pool.Release(enemy);
         }
 
         private void ResetSpawnCooldown()
         {
             _spawnCooldown = Random.Range(_minSpawnCooldown, _maxSpawnCooldown);
             _spawnTime = Time.fixedTime;
-        }
-
-        private void OnFire(ShipController enemy)
-        {
-            Vector2 position = enemy.FirePoint.position;
-            Vector2 target = _player.transform.position;
-            Vector2 direction = (target - position).normalized;
-            _bulletWorld.Spawn(
-                position,
-                direction,
-                enemy.BulletSpeed,
-                enemy.BulletDamage,
-                TeamType.Enemy
-            );
         }
 
         private Vector3 NextSpawnPosition()

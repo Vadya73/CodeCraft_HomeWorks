@@ -10,7 +10,7 @@ namespace Game
     {
         public event Action<int> OnHealthChanged;
         public event Action OnDead;
-        public event Action<ShipController> OnFire;
+        public event Action<BulletData> OnFire;
 
         [SerializeField, FormerlySerializedAs("config")]
         private ShipControllerSO _config;
@@ -30,8 +30,8 @@ namespace Game
 
         [Header("Movement")]
         [SerializeField, FormerlySerializedAs("_motor")]
-        protected Mover _mover;
-        protected Vector3 moveDirection;
+        private Mover _mover;
+        private Vector3 _moveDirection;
 
         [Header("Visual")]
         [SerializeField] private Renderer _renderer;
@@ -45,12 +45,11 @@ namespace Game
         private Material _material;
         private Tweener _damageAnimation;
 
+        public abstract TeamType Team { get; }
         public int Health => _currentHealth;
         public int MaxHealth => _config.Health;
         public bool IsAlive => _currentHealth > 0;
-        public Transform FirePoint => _firePoint;
-        public float BulletSpeed => _bulletSpeed;
-        public int BulletDamage => _bulletDamage;
+        public Vector2 Position => transform.position;
 
         private void Awake()
         {
@@ -63,10 +62,26 @@ namespace Game
 
         protected virtual void FixedUpdate() => _mover.FixedUpdate();
 
-        protected void Fire()
+        protected void Move(Vector2 direction)
+        {
+            _moveDirection = IsAlive ? direction : Vector2.zero;
+            _mover.MoveStep(_moveDirection);
+        }
+
+        protected void FireForward()
+        {
+            Fire(_firePoint.up);
+        }
+
+        protected void FireTowards(Vector2 targetPosition)
+        {
+            Fire((targetPosition - (Vector2) _firePoint.position).normalized);
+        }
+
+        private void Fire(Vector2 direction)
         {
             float time = Time.time;
-            if (time - _fireTime < _config.FireCooldown || !IsAlive)
+            if (time - _fireTime < _config.FireCooldown || !IsAlive || direction.sqrMagnitude == 0)
                 return;
 
             if (_fireSFX)
@@ -75,7 +90,15 @@ namespace Game
             if (_fireVFX)
                 _fireVFX.Play();
 
-            this.OnFire?.Invoke(this);
+            BulletData bulletData = new BulletData(
+                Team,
+                _firePoint.position,
+                direction,
+                _bulletDamage,
+                _bulletSpeed
+            );
+
+            OnFire?.Invoke(bulletData);
             _fireTime = time;
         }
 
@@ -87,8 +110,8 @@ namespace Game
         private void AnimateMovement(float deltaTime)
         {
             Vector3 shipAngles = _viewTransform.localEulerAngles;
-            shipAngles.x = _viewConfig.MoveRotationAngle * moveDirection.y;
-            shipAngles.y = _viewConfig.MoveRotationAngle / 2 * moveDirection.x * -1f;
+            shipAngles.x = _viewConfig.MoveRotationAngle * _moveDirection.y;
+            shipAngles.y = _viewConfig.MoveRotationAngle / 2 * _moveDirection.x * -1f;
 
             Quaternion shipRotation = Quaternion.Euler(shipAngles);
             float t = _viewConfig.MoveSpeed * deltaTime;
@@ -98,7 +121,8 @@ namespace Game
         public void ResetHealth()
         {
             _currentHealth = _config.Health;
-            this.OnHealthChanged?.Invoke(_currentHealth);
+            _fireTime = float.NegativeInfinity;
+            OnHealthChanged?.Invoke(_currentHealth);
         }
 
         public void TakeDamage(int damage)
@@ -110,7 +134,7 @@ namespace Game
             if (IsAlive)
                 this.AnimateDamage();
 
-            this.OnHealthChanged?.Invoke(_currentHealth);
+            OnHealthChanged?.Invoke(_currentHealth);
 
             if (!IsAlive)
                 Die();
@@ -121,7 +145,7 @@ namespace Game
             ParticleSystem prefab = _viewConfig.DestroyEffectPrefab;
             Instantiate(prefab, _viewTransform.position, prefab.transform.rotation);
 
-            this.OnDead?.Invoke();
+            OnDead?.Invoke();
             gameObject.SetActive(false);
         }
 

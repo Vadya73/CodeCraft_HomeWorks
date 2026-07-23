@@ -127,9 +127,6 @@ MonoBehaviour:
   _fireVFX: {fileID: 1792961037914348205}
   _fireSFX: {fileID: 0}
   _damageSFX: {fileID: 0}
-  target: {fileID: 0}
-  destination: {x: 0, y: 0}
-  _fireCooldown: 1.25
   _stoppingDistance: 0.25
 --- !u!82 &4560017961611896118
 AudioSource:

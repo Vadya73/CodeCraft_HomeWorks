@@ -20,6 +20,8 @@ namespace Game
         [SerializeField]
         private HealthView _healthView;
 
+        public override TeamType Team => TeamType.Player;
+
         private void OnEnable()
         {
             this.OnHealthChanged += HandleHealthChanged;
@@ -32,23 +34,20 @@ namespace Game
             this.OnDead -= HandleDead;
         }
 
-        public void Update()
+        private void Update()
         {
             if (Input.GetKeyDown(KeyCode.Space))
-                this.Fire();
+                FireForward();
 
             float dx = Input.GetAxisRaw("Horizontal");
             float dy = Input.GetAxisRaw("Vertical");
-            this.moveDirection = new Vector2(dx, dy);
-
-            if (IsAlive)
-                _mover.MoveStep(this.moveDirection);
+            Move(new Vector2(dx, dy));
         }
 
         protected override void LateUpdate()
         {
             base.LateUpdate();
-            this.transform.position = _playerArea.ClampInBounds(this.transform.position);
+            transform.position = _playerArea.ClampInBounds(transform.position);
         }
 
         private void HandleHealthChanged(int health)
