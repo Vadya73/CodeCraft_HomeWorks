@@ -1,28 +1,29 @@
 using System;
 using System.Collections.Generic;
+using Game.Scripts.Infrastructure.Pooling;
 using Modules.Utils;
 using UnityEngine;
 
-namespace Game
+namespace Game.Scripts.Combat.Bullets
 {
     // +
-    public sealed class BulletSpawner : MonoBehaviour
+    public sealed class BulletSpawner : MonoBehaviour, IBulletSpawner
     {
-        private const string DefaultLayer = "Default";
-        private const string PlayerBulletLayer = "PlayerBullet";
-        private const string EnemyBulletLayer = "EnemyBullet";
-
         [SerializeField] private Bullet _prefab;
         [SerializeField] private Transform _container;
-        [SerializeField] private BulletViewConfig _configView;
         [SerializeField] private TransformBounds _levelBounds;
         [SerializeField] private int _initialPoolSize = 10;
 
         private readonly List<Bullet> _bullets = new();
         private ComponentPool<Bullet> _pool;
 
+        public event Action<Vector3> BulletHit;
+
         private void Awake()
         {
+            if (!_levelBounds)
+                throw new InvalidOperationException("Bullet bounds are not configured");
+
             _pool = new ComponentPool<Bullet>(_prefab, _container, _initialPoolSize);
         }
 
@@ -39,9 +40,12 @@ namespace Game
 
         public void Spawn(BulletData data)
         {
-            Bullet bullet = _pool.Get();
-            bullet.Hit += OnBulletHit;
-            bullet.Launch(data, GetLayer(data.Team));
+            Bullet bullet = _pool.Rent(item =>
+            {
+                item.Launch(data);
+                item.Hit += OnBulletHit;
+            });
+
             _bullets.Add(bullet);
         }
 
@@ -49,7 +53,7 @@ namespace Game
         {
             Vector3 hitPosition = bullet.Position;
             Despawn(bullet);
-            SpawnExplosion(hitPosition);
+            BulletHit?.Invoke(hitPosition);
         }
 
         private void Despawn(Bullet bullet)
@@ -68,36 +72,12 @@ namespace Game
         {
             bullet.Hit -= OnBulletHit;
             bullet.Stop();
-            _pool.Release(bullet);
+            _pool.Return(bullet);
         }
 
-        private static int GetLayer(TeamType team)
+        private void OnValidate()
         {
-            string layerName;
-
-            switch (team)
-            {
-                case TeamType.None:
-                    layerName = DefaultLayer;
-                    break;
-                case TeamType.Player:
-                    layerName = PlayerBulletLayer;
-                    break;
-                case TeamType.Enemy:
-                    layerName = EnemyBulletLayer;
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(team), team, null);
-            }
-
-            int layer = LayerMask.NameToLayer(layerName);
-            return layer >= 0 ? layer : LayerMask.NameToLayer(DefaultLayer);
-        }
-
-        private void SpawnExplosion(Vector3 position)
-        {
-            GameObject prefab = _configView.ExplosionVFX;
-            Instantiate(prefab, position, prefab.transform.rotation);
+            _initialPoolSize = Mathf.Max(0, _initialPoolSize);
         }
     }
 }

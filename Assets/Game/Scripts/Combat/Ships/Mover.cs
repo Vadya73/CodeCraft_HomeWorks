@@ -1,24 +1,28 @@
 using System;
 using UnityEngine;
 
-namespace Game
+namespace Game.Scripts.Combat.Ships
 {
     // +
     [Serializable]
     public sealed class Mover
     {
-        public event Action<Vector3> OnMoved;
-
         [SerializeField] private Rigidbody2D _rigidbody;
         [SerializeField] private float _speed;
 
         private Vector2? _direction;
 
-        public void SetSpeed(float speed) => _speed = speed;
+        public void SetSpeed(float speed)
+        {
+            if (speed < 0)
+                throw new ArgumentOutOfRangeException(nameof(speed), speed, "Movement speed cannot be negative");
 
-        public void MoveStep(Vector2 direction) => _direction = direction;
+            _speed = speed;
+        }
 
-        public void FixedUpdate()
+        public void SetDirection(Vector2 direction) => _direction = direction;
+
+        public void Tick()
         {
             if (!_direction.HasValue)
                 return;
@@ -27,8 +31,6 @@ namespace Game
             Vector2 newPosition = _rigidbody.position + direction * (_speed * Time.fixedDeltaTime);
             _rigidbody.MovePosition(newPosition);
             _direction = null;
-            
-            this.OnMoved?.Invoke(direction);
         }
     }
 }

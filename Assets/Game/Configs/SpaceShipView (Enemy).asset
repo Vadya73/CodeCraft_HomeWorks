@@ -11,7 +11,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 589352f625ed4978bd7527569acfb19f, type: 3}
   m_Name: SpaceShipView (Enemy)
-  m_EditorClassIdentifier: Game::Game.SpaceShipViewConfig
+  m_EditorClassIdentifier: Game::Game.ShipControllerViewConfig
   <MaterialPrefab>k__BackingField: {fileID: 2100000, guid: 9230c0065227c1b4da624a6d952f0ce2, type: 2}
   <HitAnimationCurve>k__BackingField:
     serializedVersion: 2
@@ -49,5 +49,5 @@ MonoBehaviour:
   <HitPropertyName>k__BackingField: _HitBlend
   <HitDuration>k__BackingField: 0.2
   <MoveRotationAngle>k__BackingField: 30
-  <MoveSpeed>k__BackingField: 5
+  <TiltResponsiveness>k__BackingField: 5
   <DestroyEffectPrefab>k__BackingField: {fileID: 198423008863891152, guid: 91acdbd2820f9ce418996a0a24d91079, type: 3}

@@ -1,6 +1,8 @@
+using Game.Scripts.Combat.Common;
+using Game.Scripts.Combat.Ships;
 using UnityEngine;
 
-namespace Game
+namespace Game.Scripts.Combat.Enemies
 {
     // +
     public sealed class Enemy : ShipController
@@ -13,11 +15,11 @@ namespace Game
 
         public override TeamType Team => TeamType.Enemy;
 
-        private void OnEnable() => OnDead += OnCharacterDead;
+        private void OnEnable() => Died += OnCharacterDied;
 
-        private void OnDisable() => OnDead -= OnCharacterDead;
+        private void OnDisable() => Died -= OnCharacterDied;
 
-        private void OnCharacterDead() => _despawner?.Despawn(this);
+        private void OnCharacterDied() => _despawner?.Despawn(this);
 
         private void Update()
         {
@@ -38,7 +40,7 @@ namespace Game
             }
         }
 
-        public void Initialize(
+        internal void Initialize(
             ShipController target,
             Vector3 destination,
             IEnemyDespawner despawner)
@@ -46,12 +48,13 @@ namespace Game
             _target = target;
             _destination = destination;
             _despawner = despawner;
-            ResetHealth();
+            ResetForReuse();
         }
 
-        public void ResetState()
+        internal void ResetState()
         {
             _target = null;
+            _destination = Vector2.zero;
             _despawner = null;
             Move(Vector2.zero);
         }

@@ -1,32 +1,24 @@
 using System;
-using DG.Tweening;
+using Game.Scripts.Combat.Bullets;
+using Game.Scripts.Combat.Common;
 using UnityEngine;
 using UnityEngine.Serialization;
 
-namespace Game
+namespace Game.Scripts.Combat.Ships
 {
     // +
-    public abstract class ShipController : MonoBehaviour
+    public abstract class ShipController : MonoBehaviour, IDamageable
     {
-        public event Action<int> OnHealthChanged;
-        public event Action OnDead;
-        public event Action<BulletData> OnFire;
+        public event Action<int> HealthChanged;
+        public event Action Damaged;
+        public event Action Died;
+        public event Action<BulletData> Fired;
 
         [SerializeField, FormerlySerializedAs("config")]
-        private ShipControllerSO _config;
-
-        [Header("Health")]
-        [SerializeField, FormerlySerializedAs("currentHealth")]
-        private int _currentHealth;
+        private ShipConfig _config;
 
         [Header("Combat")]
-        [SerializeField, FormerlySerializedAs("firePoint")]
-        private Transform _firePoint;
-        [SerializeField, FormerlySerializedAs("bulletSpeed")]
-        private float _bulletSpeed;
-        [SerializeField, FormerlySerializedAs("bulletDamage")]
-        private int _bulletDamage;
-        private float _fireTime;
+        [SerializeField] private ShipWeapon _weapon;
 
         [Header("Movement")]
         [SerializeField, FormerlySerializedAs("_motor")]
@@ -34,136 +26,129 @@ namespace Game
         private Vector3 _moveDirection;
 
         [Header("Visual")]
-        [SerializeField] private Renderer _renderer;
-        [SerializeField] private Transform _viewTransform;
-        [SerializeField] private AudioSource _audioSource;
-        [SerializeField] private ShipControllerViewConfig _viewConfig;
-        [SerializeField] private ParticleSystem _fireVFX;
-        [SerializeField] private AudioClip _fireSFX;
-        [SerializeField] private AudioClip _damageSFX;
+        [SerializeField] private ShipView _view;
 
-        private Material _material;
-        private Tweener _damageAnimation;
+        private ShipHealth _health;
 
         public abstract TeamType Team { get; }
-        public int Health => _currentHealth;
-        public int MaxHealth => _config.Health;
-        public bool IsAlive => _currentHealth > 0;
+        public int Health => GetHealth().Current;
+        public int MaxHealth => GetHealth().Maximum;
+        public bool IsAlive => GetHealth().IsAlive;
         public Vector2 Position => transform.position;
 
         private void Awake()
         {
-            ResetHealth();
-            _mover.SetSpeed(_config.MoveSpeed);
-
-            _material = new Material(_viewConfig.MaterialPrefab);
-            _renderer.material = _material;
+            if (_health == null)
+                ResetForReuse();
         }
 
-        protected virtual void FixedUpdate() => _mover.FixedUpdate();
+        private void Initialize()
+        {
+            if (_health != null)
+                return;
 
-        protected void Move(Vector2 direction)
+            if (!_config)
+                throw new InvalidOperationException("A ship requires a ship config");
+
+            _health = new ShipHealth(_config.Health);
+            _health.HealthChanged += OnHealthChanged;
+            _health.Damaged += OnDamaged;
+            _health.Died += OnDied;
+
+            _weapon.Initialize(_config.FireCooldown);
+            _mover.SetSpeed(_config.MoveSpeed);
+            _view.Initialize();
+        }
+
+        private void OnDestroy()
+        {
+            if (_health == null)
+                return;
+
+            _health.HealthChanged -= OnHealthChanged;
+            _health.Damaged -= OnDamaged;
+            _health.Died -= OnDied;
+            _view.Dispose();
+        }
+
+        private void FixedUpdate() => _mover.Tick();
+
+        public void Move(Vector2 direction)
         {
             _moveDirection = IsAlive ? direction : Vector2.zero;
-            _mover.MoveStep(_moveDirection);
+            _mover.SetDirection(_moveDirection);
         }
 
-        protected void FireForward()
+        public void FireForward()
         {
-            Fire(_firePoint.up);
+            Fire(_weapon.Forward);
         }
 
         protected void FireTowards(Vector2 targetPosition)
         {
-            Fire((targetPosition - (Vector2) _firePoint.position).normalized);
+            Fire(_weapon.DirectionTo(targetPosition));
         }
 
         private void Fire(Vector2 direction)
         {
-            float time = Time.time;
-            if (time - _fireTime < _config.FireCooldown || !IsAlive || direction.sqrMagnitude == 0)
+            if (!IsAlive || !_weapon.TryFire(Team, direction, Time.time, out BulletData bulletData))
                 return;
 
-            if (_fireSFX)
-                _audioSource.PlayOneShot(_fireSFX);
-
-            if (_fireVFX)
-                _fireVFX.Play();
-
-            BulletData bulletData = new BulletData(
-                Team,
-                _firePoint.position,
-                direction,
-                _bulletDamage,
-                _bulletSpeed
-            );
-
-            OnFire?.Invoke(bulletData);
-            _fireTime = time;
+            _view.PlayFire();
+            Fired?.Invoke(bulletData);
         }
 
-        protected virtual void LateUpdate()
+        private void LateUpdate()
         {
-            this.AnimateMovement(Time.deltaTime);
+            _view.Tick(_moveDirection, Time.deltaTime);
         }
 
-        private void AnimateMovement(float deltaTime)
+        protected void ResetForReuse()
         {
-            Vector3 shipAngles = _viewTransform.localEulerAngles;
-            shipAngles.x = _viewConfig.MoveRotationAngle * _moveDirection.y;
-            shipAngles.y = _viewConfig.MoveRotationAngle / 2 * _moveDirection.x * -1f;
-
-            Quaternion shipRotation = Quaternion.Euler(shipAngles);
-            float t = _viewConfig.MoveSpeed * deltaTime;
-            _viewTransform.localRotation = Quaternion.Lerp(_viewTransform.localRotation, shipRotation, t);
-        }
-
-        public void ResetHealth()
-        {
-            _currentHealth = _config.Health;
-            _fireTime = float.NegativeInfinity;
-            OnHealthChanged?.Invoke(_currentHealth);
+            Initialize();
+            _health.Reset();
+            _weapon.Reset();
+            _moveDirection = Vector2.zero;
+            _mover.SetDirection(Vector2.zero);
+            _view.Reset();
         }
 
         public void TakeDamage(int damage)
         {
-            if (damage <= 0 || !IsAlive)
-                return;
-
-            _currentHealth = Mathf.Clamp(_currentHealth - damage, 0, MaxHealth);
-            if (IsAlive)
-                this.AnimateDamage();
-
-            OnHealthChanged?.Invoke(_currentHealth);
-
-            if (!IsAlive)
-                Die();
+            GetHealth().TakeDamage(damage);
         }
 
-        private void Die()
+        private void OnHealthChanged(int health)
         {
-            ParticleSystem prefab = _viewConfig.DestroyEffectPrefab;
-            Instantiate(prefab, _viewTransform.position, prefab.transform.rotation);
+            HealthChanged?.Invoke(health);
+        }
 
-            OnDead?.Invoke();
+        private void OnDamaged()
+        {
+            if (IsAlive)
+                _view.PlayDamage();
+
+            Damaged?.Invoke();
+        }
+
+        private void OnDied()
+        {
+            _moveDirection = Vector2.zero;
+            _mover.SetDirection(Vector2.zero);
+            _view.PlayDeath();
+            Died?.Invoke();
             gameObject.SetActive(false);
         }
 
-        private void AnimateDamage()
+        private void OnValidate()
         {
-            if (_damageAnimation != null && _damageAnimation.IsActive())
-                _damageAnimation.Kill();
+            _weapon?.Validate();
+        }
 
-            _damageAnimation = DOVirtual.Float(
-                0f,
-                1f,
-                _viewConfig.HitDuration,
-                progress => _material?.SetFloat(_viewConfig.HitPropertyName,
-                    _viewConfig.HitAnimationCurve.Evaluate(progress))
-            ).SetLink(_renderer.gameObject);
-
-            if (_damageSFX)
-                _audioSource.PlayOneShot(_damageSFX);
+        private ShipHealth GetHealth()
+        {
+            Initialize();
+            return _health;
         }
     }
 }

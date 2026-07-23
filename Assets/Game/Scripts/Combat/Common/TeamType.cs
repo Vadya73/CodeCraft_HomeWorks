@@ -1,4 +1,4 @@
-﻿namespace Game
+﻿namespace Game.Scripts.Combat.Common
 {
     // +
     public enum TeamType

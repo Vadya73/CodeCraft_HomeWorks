@@ -1,4 +1,4 @@
-namespace Game
+namespace Game.Scripts.Combat.Enemies
 {
     // +
     public interface IEnemyDespawner

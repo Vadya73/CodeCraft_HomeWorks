@@ -112,21 +112,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e09a324f54d94d6e84681731f36566c4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  config: {fileID: 11400000, guid: 342eb63e507d644daae6ffc27bd8fc71, type: 2}
-  currentHealth: 2
-  firePoint: {fileID: 3195880656587174614}
-  bulletSpeed: 3
-  bulletDamage: 1
-  _motor:
+  _config: {fileID: 11400000, guid: 342eb63e507d644daae6ffc27bd8fc71, type: 2}
+  _weapon:
+    _firePoint: {fileID: 3195880656587174614}
+    _bulletSpeed: 3
+    _bulletDamage: 1
+  _mover:
     _rigidbody: {fileID: 659620479434099170}
     _speed: 2
-  _renderer: {fileID: 1333951631294404335}
-  _viewTransform: {fileID: 2570692159425164225}
-  _audioSource: {fileID: 4560017961611896118}
-  _viewConfig: {fileID: 11400000, guid: f6ecf0b3d1d004b3893cc42c64995303, type: 2}
-  _fireVFX: {fileID: 1792961037914348205}
-  _fireSFX: {fileID: 0}
-  _damageSFX: {fileID: 0}
+  _view:
+    _renderer: {fileID: 1333951631294404335}
+    _viewTransform: {fileID: 2570692159425164225}
+    _audioSource: {fileID: 4560017961611896118}
+    _config: {fileID: 11400000, guid: f6ecf0b3d1d004b3893cc42c64995303, type: 2}
+    _fireVFX: {fileID: 1792961037914348205}
+    _fireSFX: {fileID: 0}
+    _damageSFX: {fileID: 0}
   _stoppingDistance: 0.25
 --- !u!82 &4560017961611896118
 AudioSource:

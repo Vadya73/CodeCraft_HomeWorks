@@ -1,6 +1,7 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
-namespace Game
+namespace Game.Scripts.Combat.Ships
 {
     // +
     [CreateAssetMenu(menuName = "Game/ShipControllerViewConfig", order = 0)]
@@ -18,9 +19,16 @@ namespace Game
         [Header("Move")]
         [field: SerializeField] public float MoveRotationAngle { get; private set; } = 30f;
 
-        [field: SerializeField] public float MoveSpeed { get; private set; } = 5;
+        [field: SerializeField, FormerlySerializedAs("<MoveSpeed>k__BackingField")]
+        public float TiltResponsiveness { get; private set; } = 5;
 
         [Header("Destroy")]
         [field: SerializeField] public ParticleSystem DestroyEffectPrefab { get; private set; }
+
+        private void OnValidate()
+        {
+            HitDuration = Mathf.Max(0, HitDuration);
+            TiltResponsiveness = Mathf.Max(0, TiltResponsiveness);
+        }
     }
 }

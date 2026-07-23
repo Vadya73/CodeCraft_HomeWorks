@@ -1,7 +1,7 @@
 using Modules.UI;
 using UnityEngine;
 
-namespace Game
+namespace Game.Scripts.Combat.Enemies
 {
     public sealed class EnemyScorePresenter : MonoBehaviour
     {

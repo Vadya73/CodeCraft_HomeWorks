@@ -49,25 +49,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: aab487c3ce89407b8153f9c2ff593bc3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Game::Game.PlayerShip
-  config: {fileID: 11400000, guid: 0b9a4576e5f0a4babb44b3c82e6480d0, type: 2}
-  currentHealth: 10
-  firePoint: {fileID: 8503432944885784460}
-  bulletSpeed: 7
-  bulletDamage: 1
-  _motor:
+  _config: {fileID: 11400000, guid: 0b9a4576e5f0a4babb44b3c82e6480d0, type: 2}
+  _weapon:
+    _firePoint: {fileID: 8503432944885784460}
+    _bulletSpeed: 7
+    _bulletDamage: 1
+  _mover:
     _rigidbody: {fileID: 4575139502811685103}
     _speed: 10
-  _renderer: {fileID: 795037679980988590}
-  _viewTransform: {fileID: 1249406481267314197}
-  _audioSource: {fileID: 8141832910989862937}
-  _viewConfig: {fileID: 11400000, guid: 9298f762411724a389beae656b1dfcaa, type: 2}
-  _fireVFX: {fileID: 375007784130398055}
-  _fireSFX: {fileID: 8300000, guid: 4b0fadb8fc7bdaf489e9f7879d3c71bb, type: 3}
-  _damageSFX: {fileID: 8300000, guid: 9d2f129290cb1a6489928f3dde8dbb39, type: 3}
-  _playerArea: {fileID: 0}
-  _cameraShaker: {fileID: 0}
-  _gameOverView: {fileID: 0}
-  _healthView: {fileID: 0}
+  _view:
+    _renderer: {fileID: 795037679980988590}
+    _viewTransform: {fileID: 1249406481267314197}
+    _audioSource: {fileID: 8141832910989862937}
+    _config: {fileID: 11400000, guid: 9298f762411724a389beae656b1dfcaa, type: 2}
+    _fireVFX: {fileID: 375007784130398055}
+    _fireSFX: {fileID: 8300000, guid: 4b0fadb8fc7bdaf489e9f7879d3c71bb, type: 3}
+    _damageSFX: {fileID: 8300000, guid: 9d2f129290cb1a6489928f3dde8dbb39, type: 3}
 --- !u!50 &4575139502811685103
 Rigidbody2D:
   serializedVersion: 5
